@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    margin: 0;
+    background-color: #030712;
+    color: #f9fafb;
+    font-family: system-ui, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  .input-base {
+    @apply w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500;
+  }
+
+  .label-base {
+    @apply block text-sm font-medium text-gray-300 mb-1;
+  }
+}
+
+@media print {
+  nav, .no-print { display: none !important; }
+  body { background: white !important; color: black !important; font-family: '맑은 고딕', sans-serif; }
+  #root { background: white !important; }
+  #report-body { padding: 10mm; }
+  .report-section { margin-bottom: 16pt; page-break-inside: avoid; }
+  .report-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 8pt; }
+  .report-table th { background: #e8e8e8 !important; padding: 5pt 8pt; border: 1px solid #999; text-align: left; font-weight: 600; }
+  .report-table td { padding: 4pt 8pt; border: 1px solid #bbb; }
+  .law-ref { color: #555; font-size: 8pt; font-style: italic; }
+  .check-ok   { color: #006600; font-weight: 600; }
+  .check-fail { color: #cc0000; font-weight: 600; }
+  .check-warn { color: #996600; font-weight: 600; }
+}
