@@ -9,5 +9,15 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- 새 기능 소식 구독 (로그인 없음, 90초 뒤 1회 노출, 거절하면 30일간 안 뜸) -->
+    <script src="https://choi-ilkwon.github.io/js/subscribe.js?v=2"></script>
+    <script>
+      MEPSubscribe.init({
+        apiUrl:  "https://script.google.com/macros/s/AKfycbzOwmnJdBeqkH4QMdbQRagHXFnOA7sXnkQDmGeerVi4mYUF9WL_vB3C8LIq1-AZekQX/exec",
+        appId:   "sprinkler",
+        appName: "스프링클러 설계 가이드"
+      });
+    </script>
   </body>
 </html>
