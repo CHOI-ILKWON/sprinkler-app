@@ -27,9 +27,14 @@ export type BuildingUsage =
   | 'stage'
   | 'apartment';
 
+/** 흡입 방식 — 수조 최저수위(L.W.L)와 펌프 임펠러 중심의 표고 관계 */
+export type SuctionType = 'flooded' | 'lift';
+
 export interface DesignCondition {
   /** 적용 기준 — NFTC 103 / NFPC 609 / NFPC 609(랙식) */
   standard: StandardCode;
+  /** 정압수조(flooded) / 부압수조(lift) — 흡입측 부속 구성을 가른다 */
+  suctionType: SuctionType;
   /** 표 2.1.1.1의 설치장소 id (창고는 사용하지 않음) */
   placeCategoryId: string;
   usage: BuildingUsage;

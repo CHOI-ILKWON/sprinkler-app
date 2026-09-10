@@ -1,4 +1,4 @@
-import type { DesignCondition, SystemResult, SystemType, StandardCode } from '../../types';
+import type { DesignCondition, SystemResult, SystemType, StandardCode, SuctionType } from '../../types';
 import { SYSTEM_LABELS } from '../../types';
 import { selectSystem } from '../../lib/systemSelector';
 import {
@@ -11,6 +11,8 @@ import {
   INSTALL_TARGETS_LAW,
   ESFR,
   KFS_1013_NOTE,
+  SUCTION_TYPE,
+  SUCTION_TYPE_EVIDENCE,
 } from '../../constants/nfpc';
 import CheckTable, { LawList } from '../ui/CheckTable';
 
@@ -68,6 +70,59 @@ export default function SelectTab({ condition, setCondition, result, setResult }
             방호구역의 개수, 30개 이상이면 30개) — <span className="font-mono">NFPC 609 제7조②1</span>
           </div>
         )}
+
+        <Field
+          label="흡입 방식"
+          hint={`판단 기준은 「${SUCTION_TYPE[condition.suctionType].criterion}」 하나뿐입니다. 계통도의 그림상 높낮이는 축척이 아니므로 근거가 되지 못합니다.`}
+        >
+          <select
+            className="input-base"
+            value={condition.suctionType}
+            onChange={e => set('suctionType', e.target.value as SuctionType)}
+          >
+            <option value="flooded">{SUCTION_TYPE.flooded.label}</option>
+            <option value="lift">{SUCTION_TYPE.lift.label}</option>
+          </select>
+        </Field>
+
+        <div className="bg-gray-900 border border-gray-700 rounded-lg p-3 space-y-1.5">
+          <div className="text-[11px] font-semibold text-gray-300">
+            {condition.suctionType === 'lift' ? '부압수조 — 추가로 필요한 것' : '정압수조 — 필요 없는 것'}
+          </div>
+          {(condition.suctionType === 'lift'
+            ? SUCTION_TYPE.lift.required
+            : SUCTION_TYPE.flooded.notRequired
+          ).map((x, i) => (
+            <p key={i} className="text-[11px] text-gray-400 leading-relaxed">· {x}</p>
+          ))}
+          <details className="pt-1">
+            <summary className="text-[11px] text-blue-300 cursor-pointer">흡입방식 확정 근거의 강도</summary>
+            <table className="w-full text-[10px] mt-1">
+              <tbody className="divide-y divide-gray-800">
+                {SUCTION_TYPE_EVIDENCE.map(e => (
+                  <tr key={e.item} className="align-top">
+                    <td className="py-1 pr-2 text-gray-300">{e.item}</td>
+                    <td
+                      className={
+                        'py-1 pr-2 whitespace-nowrap font-semibold ' +
+                        (e.strength === '확정'
+                          ? 'text-green-400'
+                          : e.strength === '강함'
+                            ? 'text-blue-400'
+                            : e.strength === '중간'
+                              ? 'text-yellow-400'
+                              : 'text-red-400')
+                      }
+                    >
+                      {e.strength}
+                    </td>
+                    <td className="py-1 text-gray-500">{e.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        </div>
 
         <Field label="용도" hint="법정 강제 방식 판단에 사용됩니다">
           <select

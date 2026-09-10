@@ -25,6 +25,7 @@ import type {
 
 const DEFAULT_CONDITION: DesignCondition = {
   standard: 'nftc103',
+  suctionType: 'flooded',
   placeCategoryId: 'other_h8_under',
   usage: 'general_h8_under',
   fireproof: true,

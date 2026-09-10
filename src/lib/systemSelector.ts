@@ -15,7 +15,7 @@
  *  · NFTC 103 2.6.3.2    준비작동식·일제살수식 화재감지회로는 교차회로. 단서 2가지 예외
  */
 
-import type { DesignCondition, SystemResult, SystemType, ValveItem, LawCheck } from '../types';
+import type { DesignCondition, SystemResult, SystemType, ValveItem, LawCheck, SuctionType } from '../types';
 import { SYSTEM_LABELS } from '../types';
 import {
   PARKING_RULE,
@@ -34,6 +34,8 @@ import {
   JOCKEY_SIZING,
   HEAD_PRESSURE,
   PRV_NAMING_WARNING,
+  SUCTION_TYPE,
+  SUCTION_TYPE_EVIDENCE,
 } from '../constants/nfpc';
 
 interface Mandate {
@@ -150,7 +152,7 @@ export function selectSystem(c: DesignCondition): SystemResult {
     isManualOverride,
     reasons,
     laws: [...laws, ...getLawsForSystem(system, c)],
-    valves: getValveList(system),
+    valves: getValveList(system, '100A', c.suctionType),
     checks: buildChecks(system, c),
   };
 }
@@ -273,6 +275,43 @@ function buildChecks(system: SystemType, c: DesignCondition): LawCheck[] {
     });
   }
 
+  const st = SUCTION_TYPE[c.suctionType];
+  checks.push({
+    label: '흡입 방식',
+    actual: st.label,
+    standard: `판단 기준 — ${st.criterion}. 계통도의 그림상 높낮이는 축척이 아니므로 판단 근거가 되지 못한다`,
+    isPassing: true,
+    isWarning: true,
+    law: 'NFTC 103 2.2.1.4 / 2.2.1.9 / 2.5.4.2',
+  });
+  if (c.suctionType === 'lift') {
+    checks.push({
+      label: '부압수조 필수 부속',
+      actual: '후드밸브 · 물올림장치 · 연성계 · 펌프별 전용 흡입배관',
+      standard: SUCTION_TYPE.lift.required.join(' / '),
+      isPassing: true,
+      isWarning: true,
+      law: 'NFTC 103 2.2.1.4 본문 / 2.2.1.9 / 2.5.4.2',
+    });
+  } else {
+    checks.push({
+      label: '정압수조 — 불요 항목',
+      actual: '후드밸브 · 물올림장치 · 연성계',
+      standard: SUCTION_TYPE.flooded.notRequired.join(' / '),
+      isPassing: true,
+      isWarning: true,
+      law: 'NFTC 103 2.2.1.4 단서 / 2.2.1.9',
+    });
+    checks.push({
+      label: '⚠ 흡입방식 확정 근거',
+      actual: SUCTION_TYPE_EVIDENCE.filter(e => e.strength === '확정').map(e => e.item).join(' / '),
+      standard: '후드밸브·물올림탱크의 유무나 계통도의 그림상 높낮이만으로 단정하지 말 것',
+      isPassing: true,
+      isWarning: true,
+      law: '설계 검토 사항',
+    });
+  }
+
   checks.push({
     label: '조기반응형 헤드 대상',
     actual: QUICK_RESPONSE.places.join(' / '),
@@ -286,7 +325,7 @@ function buildChecks(system: SystemType, c: DesignCondition): LawCheck[] {
 }
 
 /** 방식별 밸브·부속 목록 — 각 항목에 근거 조문을 붙인다 */
-export function getValveList(system: SystemType, size = '100A'): ValveItem[] {
+export function getValveList(system: SystemType, size = '100A', suctionType: SuctionType = 'flooded'): ValveItem[] {
   const pumpCommon: ValveItem[] = [
     {
       icon: '🔩',
@@ -337,9 +376,38 @@ export function getValveList(system: SystemType, size = '100A'): ValveItem[] {
         `면제: ${JOCKEY_SIZING.exemptions.join(' / ')}`,
       law: JOCKEY_SIZING.law,
     },
+    ...(suctionType === 'lift'
+      ? [
+          {
+            icon: '🦶',
+            name: '후드밸브 (부압수조 전용)',
+            size,
+            desc:
+              '흡수구 끝의 체크밸브 + 여과망 일체형. 펌프 정지 시 흡입배관의 물이 수조로 되돌아가는 것을 막아 마중물을 유지한다. ' +
+              '정압수조에는 필요 없다 — 흡입측 계통에서 정압/부압을 가르는 유일한 「배관상」 차이가 이것이다.',
+            law: '국내 기준에 후드밸브 명문 규정은 없음 — 2.2.1.9(물올림장치)가 부압수조를 전제하는 데서 도출 ⚠',
+          },
+          {
+            icon: '📉',
+            name: '연성계 또는 진공계 (부압수조 필수)',
+            size: '-',
+            desc:
+              '흡입측이 부압이므로 일반 압력계로는 읽을 수 없다. 토출측 압력계와 짝을 이뤄 전양정을 산출한다. ' +
+              '정압수조·수직회전축펌프는 2.2.1.4 단서로 생략 가능(설치해도 무방).',
+            law: 'NFTC 103 2.2.1.4 본문',
+          },
+          {
+            icon: '🔀',
+            name: '펌프별 전용 흡입배관 (부압수조 필수)',
+            size,
+            desc: '수조가 펌프보다 낮게 설치된 경우 각 펌프(충압펌프 포함)마다 수조로부터 별도로 설치할 것',
+            law: 'NFTC 103 2.5.4.2',
+          },
+        ]
+      : []),
     {
       icon: '💧',
-      name: '물올림장치 (부압수조 시)',
+      name: suctionType === 'lift' ? '물올림장치 (필수)' : '물올림장치 (정압수조 — 불요)',
       size: `전용수조 ${PUMP_ACCESSORY.primingTankLiters} L 이상 / 급수배관 ${PUMP_ACCESSORY.primingSupplyMM} ㎜ 이상`,
       desc:
         '수원의 수위가 펌프보다 낮은 경우에만 설치. 후드밸브~임펠러 구간을 항상 물로 채워 마중물을 유지. ' +
