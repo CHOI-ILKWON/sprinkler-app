@@ -1,325 +1,315 @@
-import type { DesignCondition, SystemResult, SystemType, BuildingUsage, Room, RiskLevel } from '../../types';
+import type { DesignCondition, SystemResult, SystemType, StandardCode } from '../../types';
+import { SYSTEM_LABELS } from '../../types';
 import { selectSystem } from '../../lib/systemSelector';
-import { calcWarehouseZones } from '../../lib/zoneCalc';
-import ZonePreview from '../ZonePreview';
-import Badge from '../ui/Badge';
+import {
+  STANDARD_HEAD_COUNT,
+  STANDARD_HEAD_COUNT_LAW,
+  STANDARD_HEAD_COUNT_NOTE,
+  STANDARD_LABEL,
+  WAREHOUSE_STANDARD_HEAD_COUNT,
+  INSTALL_TARGETS,
+  INSTALL_TARGETS_LAW,
+  ESFR,
+  KFS_1013_NOTE,
+} from '../../constants/nfpc';
+import CheckTable, { LawList } from '../ui/CheckTable';
 
-interface SelectTabProps {
+interface Props {
   condition: DesignCondition;
   setCondition: React.Dispatch<React.SetStateAction<DesignCondition>>;
   result: SystemResult | null;
-  setResult: React.Dispatch<React.SetStateAction<SystemResult | null>>;
-  rooms: Room[];
+  setResult: (r: SystemResult) => void;
 }
 
-const WAREHOUSE_USAGES: BuildingUsage[] = [
-  'warehouse_general', 'warehouse_rack', 'warehouse_high', 'cold_storage',
-];
+export default function SelectTab({ condition, setCondition, result, setResult }: Props) {
+  const set = <K extends keyof DesignCondition>(k: K, v: DesignCondition[K]) =>
+    setCondition(c => ({ ...c, [k]: v }));
 
-const USAGE_OPTIONS: { value: BuildingUsage; label: string; group: string }[] = [
-  { value: 'office',           label: '사무소',         group: '업무·숙박·주거' },
-  { value: 'hotel',            label: '호텔',           group: '업무·숙박·주거' },
-  { value: 'apartment',        label: '아파트',         group: '업무·숙박·주거' },
-  { value: 'hospital',         label: '병원',           group: '의료·문화' },
-  { value: 'museum',           label: '박물관·미술관',  group: '의료·문화' },
-  { value: 'retail',           label: '판매시설',       group: '상업·공연' },
-  { value: 'stage',            label: '무대부',         group: '상업·공연' },
-  { value: 'parking_indoor',   label: '옥내 주차장',    group: '주차장' },
-  { value: 'parking_outdoor',  label: '옥외 주차장',    group: '주차장' },
-  { value: 'factory_normal',   label: '공장 (무위험)',  group: '공장' },
-  { value: 'factory_hazard',   label: '공장 (위험)',    group: '공장' },
-  { value: 'data_center',      label: '데이터센터',     group: '특수' },
-  { value: 'warehouse_general',label: '창고 (일반)',    group: '창고' },
-  { value: 'warehouse_rack',   label: '창고 (랙식)',    group: '창고' },
-  { value: 'warehouse_high',   label: '창고 (고천장)',  group: '창고' },
-  { value: 'cold_storage',     label: '냉동·냉장창고',  group: '창고' },
-];
-
-const SYSTEM_COLOR: Record<SystemType, 'blue' | 'yellow' | 'purple' | 'red'> = {
-  wet:       'blue',
-  dry:       'yellow',
-  preaction: 'purple',
-  deluge:    'red',
-};
-
-const SYSTEM_LABEL: Record<SystemType, string> = {
-  wet:       '습식',
-  dry:       '건식',
-  preaction: '준비작동식',
-  deluge:    '일제살수식',
-};
-
-export default function SelectTab({ condition, setCondition, result, setResult, rooms }: SelectTabProps) {
-  const isWarehouse = WAREHOUSE_USAGES.includes(condition.usage);
-
-  const handleCalc = () => {
-    const res = selectSystem(condition);
-
-    if (isWarehouse && (condition.warehouseSystemOverride === 'wet' || condition.warehouseSystemOverride === 'dry' || !condition.warehouseSystemOverride)) {
-      const whSystem = condition.warehouseSystemOverride ?? (res.system === 'wet' || res.system === 'dry' ? res.system : 'wet');
-      if (whSystem === 'wet' || whSystem === 'dry') {
-        const calcRooms = rooms.length > 0 ? rooms : estimateRoomsFromArea(condition.totalArea, condition.usage);
-        const check = calcWarehouseZones(calcRooms, whSystem);
-        res.warehouseCheck = check;
-      }
-    }
-
-    setResult(res);
-  };
-
-  const update = <K extends keyof DesignCondition>(key: K, val: DesignCondition[K]) =>
-    setCondition(c => ({ ...c, [key]: val }));
+  const isWarehouse = condition.standard !== 'nftc103';
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* 입력 패널 */}
-      <div className="space-y-5">
-        <h2 className="text-base font-bold text-white">설계 조건 입력</h2>
+      <div className="space-y-4">
+        <h2 className="text-base font-bold text-white">설계 조건</h2>
 
-        <Field label="건물 용도">
+        <Field label="적용 기준" hint="창고시설은 2024.1.1부터 NFPC 609가 단독 규율 (NFPC 609 부칙 제3조①)">
           <select
             className="input-base"
-            value={condition.usage}
-            onChange={e => update('usage', e.target.value as BuildingUsage)}
+            value={condition.standard}
+            onChange={e => set('standard', e.target.value as StandardCode)}
           >
-            {Array.from(new Set(USAGE_OPTIONS.map(o => o.group))).map(g => (
-              <optgroup key={g} label={g}>
-                {USAGE_OPTIONS.filter(o => o.group === g).map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </optgroup>
+            {(Object.keys(STANDARD_LABEL) as StandardCode[]).map(k => (
+              <option key={k} value={k}>
+                {STANDARD_LABEL[k]}
+              </option>
             ))}
           </select>
         </Field>
 
-        <Field label="천장 온도 환경">
-          <Radio name="temp" value={condition.temp} onChange={v => update('temp', v as DesignCondition['temp'])}
-            options={[
-              { value: 'normal', label: '일반 (4°C 이상)' },
-              { value: 'cold',   label: '저온 (동결 가능)' },
-              { value: 'freeze', label: '동결 (-10°C 이하)' },
-            ]}
-          />
-        </Field>
+        {!isWarehouse && (
+          <Field label="설치장소 (기준개수)" hint={`${STANDARD_HEAD_COUNT_LAW} — ${STANDARD_HEAD_COUNT_NOTE}`}>
+            <select
+              className="input-base"
+              value={condition.placeCategoryId}
+              onChange={e => set('placeCategoryId', e.target.value)}
+            >
+              {STANDARD_HEAD_COUNT.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.detail} → {p.count}개
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
 
-        <Field label="천장고 (m)">
-          <input
-            type="number" min={2} max={30} step={0.5}
-            className="input-base w-32"
-            value={condition.ceiling}
-            onChange={e => update('ceiling', parseFloat(e.target.value) || 3)}
-          />
-        </Field>
+        {isWarehouse && (
+          <div className="bg-blue-950/40 border border-blue-800 rounded-lg p-3 text-xs text-blue-200 leading-relaxed">
+            창고시설의 기준개수는 <b>{WAREHOUSE_STANDARD_HEAD_COUNT}개</b> (라지드롭형 헤드 설치개수가 가장 많은
+            방호구역의 개수, 30개 이상이면 30개) — <span className="font-mono">NFPC 609 제7조②1</span>
+          </div>
+        )}
 
-        <Field label="수손 피해 민감도">
-          <Radio name="damage" value={condition.damage} onChange={v => update('damage', v as DesignCondition['damage'])}
-            options={[
-              { value: 'normal',    label: '일반' },
-              { value: 'sensitive', label: '민감 (전산장비 등)' },
-              { value: 'critical',  label: '치명 (데이터센터급)' },
-            ]}
-          />
-        </Field>
-
-        <Field label="화재 특성">
-          <Radio name="fire" value={condition.fire} onChange={v => update('fire', v as DesignCondition['fire'])}
-            options={[
-              { value: 'slow', label: '일반·완만' },
-              { value: 'fast', label: '급속 (가연물 다량)' },
-            ]}
-          />
+        <Field label="용도" hint="법정 강제 방식 판단에 사용됩니다">
+          <select
+            className="input-base"
+            value={condition.usage}
+            onChange={e => set('usage', e.target.value as DesignCondition['usage'])}
+          >
+            <option value="general_h8_under">일반 (사무실·판매·의료 등)</option>
+            <option value="factory_other">공장</option>
+            <option value="parking">주차장</option>
+            <option value="stage">무대부</option>
+            <option value="warehouse_general">창고</option>
+          </select>
         </Field>
 
         <Field
-          label="총 방호면적 (㎡)"
-          hint="SP가 설치되는 모든 바닥면적 합산. 복도·계단·화장실 등 SP 미설치 공간 제외. 창고의 경우 이 값으로 밸브 개수를 사전 추정합니다. 정확한 계산은 탭3에서 자동 산정됩니다."
+          label="구조"
+          hint="수평거리 2.1 m / 내화구조 2.3 m — NFTC 103 2.7.3.4"
         >
-          <input
-            type="number" min={1} step={10}
-            className="input-base w-40"
-            value={condition.totalArea}
-            onChange={e => update('totalArea', parseFloat(e.target.value) || 0)}
-          />
-          <span className="text-gray-500 text-xs ml-2">㎡</span>
+          <select
+            className="input-base"
+            value={condition.fireproof ? 'y' : 'n'}
+            onChange={e => set('fireproof', e.target.value === 'y')}
+          >
+            <option value="y">내화구조 (R = 2.3 m)</option>
+            <option value="n">비내화구조 (R = 2.1 m)</option>
+          </select>
+        </Field>
+
+        <Field label="동결 우려" hint="NFTC 103 2.5.15 (주차장) / NFPC 609 제7조①1 (창고)">
+          <select
+            className="input-base"
+            value={condition.temp}
+            onChange={e => set('temp', e.target.value as DesignCondition['temp'])}
+          >
+            <option value="normal">없음 (상시 난방 또는 동결 우려 없음)</option>
+            <option value="cold">저온 (동결 가능성 있음)</option>
+            <option value="freeze">영하 환경</option>
+          </select>
         </Field>
 
         {isWarehouse && (
-          <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 space-y-3">
-            <div className="text-sm font-semibold text-gray-300">창고 시스템 직접 선택</div>
-            <div className="text-xs text-gray-500 mb-2">선택하지 않으면 조건에 따라 자동 권장됩니다.</div>
-            <div className="space-y-2">
-              <RadioRow
-                name="whSystem"
-                value=""
-                checked={!condition.warehouseSystemOverride}
-                onChange={() => update('warehouseSystemOverride', undefined)}
-                label="자동 선정 (권장)"
-              />
-              <RadioRow
-                name="whSystem"
-                value="wet"
-                checked={condition.warehouseSystemOverride === 'wet'}
-                onChange={() => update('warehouseSystemOverride', 'wet')}
-                label="습식 선택"
-                hint="밸브당 3,000㎡ / 200헤드"
-              />
-              <RadioRow
-                name="whSystem"
-                value="dry"
-                checked={condition.warehouseSystemOverride === 'dry'}
-                onChange={() => update('warehouseSystemOverride', 'dry')}
-                label="건식 선택"
-                hint="밸브당 1,850㎡ / 500헤드 / 60초 충수"
-              />
-            </div>
+          <div className="space-y-2">
+            <Check
+              checked={condition.coldStorage}
+              onChange={v => set('coldStorage', v)}
+              label="냉동창고 또는 영하의 온도로 저장하는 냉장창고"
+              law="NFPC 609 제7조①1 가목 — 건식 허용"
+            />
+            <Check
+              checked={condition.unheatedWarehouse}
+              onChange={v => set('unheatedWarehouse', v)}
+              label="상시 근무자가 없어 난방을 하지 않는 창고시설"
+              law="NFPC 609 제7조①1 나목 — 건식 허용"
+            />
           </div>
         )}
+
+        <Field label="천장(반자) 높이 (m)" hint={`랙식 창고는 ${ESFR.maxCeilingHeight} m 이하이면 ESFR 선택 가능 (NFPC 609 제7조①4)`}>
+          <input
+            type="number"
+            min={2}
+            step={0.1}
+            className="input-base"
+            value={condition.ceiling}
+            onChange={e => set('ceiling', parseFloat(e.target.value) || 0)}
+          />
+        </Field>
+
+        <Field label="수손 민감도" hint="법정 강제가 아니라 설계 판단입니다">
+          <select
+            className="input-base"
+            value={condition.damage}
+            onChange={e => set('damage', e.target.value as DesignCondition['damage'])}
+          >
+            <option value="normal">일반</option>
+            <option value="sensitive">민감 (수손 시 손실 큼)</option>
+            <option value="critical">치명적 (전산실·수장고 등)</option>
+          </select>
+        </Field>
+
+        <Check
+          checked={condition.gridPipe}
+          onChange={v => set('gridPipe', v)}
+          label="격자형(그리드) 배관방식 채택"
+          law="NFTC 103 2.3.1.1 단서 — 방호구역 3,700 ㎡ / 2.5.9.2.2 — 가지배관 8개 예외"
+        />
+
+        <Field label="방식 직접 지정 (선택)" hint="법정 기준과 다르면 경고가 표시됩니다">
+          <select
+            className="input-base"
+            value={condition.systemOverride ?? ''}
+            onChange={e =>
+              set('systemOverride', (e.target.value || undefined) as SystemType | undefined)
+            }
+          >
+            <option value="">자동 판정</option>
+            {(Object.keys(SYSTEM_LABELS) as SystemType[]).map(s => (
+              <option key={s} value={s}>
+                {SYSTEM_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         <button
-          onClick={handleCalc}
+          onClick={() => setResult(selectSystem(condition))}
           className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg transition-colors"
         >
-          시스템 선정 계산
+          방식 판정
         </button>
+
+        <p className="text-[11px] text-gray-500 leading-relaxed border-t border-gray-800 pt-3">{KFS_1013_NOTE}</p>
       </div>
 
-      {/* 결과 패널 */}
-      <div>
+      <div className="space-y-4">
         {result ? (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-white">선정 결과</h2>
-
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-4">
-                <Badge color={SYSTEM_COLOR[result.system]}>
-                  {SYSTEM_LABEL[result.system]}식 스프링클러
-                </Badge>
-                {result.isManualOverride && (
-                  <Badge color="yellow">사용자 선택</Badge>
-                )}
+          <>
+            <div
+              className={
+                'rounded-lg p-4 border ' +
+                (result.isMandated
+                  ? 'bg-blue-950/40 border-blue-700'
+                  : result.isManualOverride
+                    ? 'bg-yellow-950/30 border-yellow-700'
+                    : 'bg-gray-800 border-gray-700')
+              }
+            >
+              <div className="text-xs text-gray-400 mb-1">
+                {result.isMandated ? '법정 강제' : result.isManualOverride ? '사용자 지정' : '설계 판단'}
               </div>
-
-              {result.reasons.length > 0 && (
-                <div className="mb-3">
-                  <div className="text-xs font-semibold text-gray-400 mb-1">선정 이유</div>
-                  {result.reasons.map((r, i) => (
-                    <div key={i} className="text-sm text-gray-300">• {r}</div>
-                  ))}
-                </div>
-              )}
-
-              {result.laws.length > 0 && (
-                <div className="mb-3">
-                  <div className="text-xs font-semibold text-gray-400 mb-1">적용 법규</div>
-                  {result.laws.map((l, i) => (
-                    <div key={i} className="text-xs text-gray-500">• {l}</div>
-                  ))}
-                </div>
-              )}
-
-              {result.valves.length > 0 && (
-                <div>
-                  <div className="text-xs font-semibold text-gray-400 mb-2">필요 밸브류</div>
-                  <div className="space-y-1">
-                    {result.valves.map((v, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
-                        <span>{v.icon}</span>
-                        <span className="font-medium">{v.name}</span>
-                        <span className="text-gray-500">({v.size})</span>
-                        <span className="text-gray-500">— {v.desc}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="text-2xl font-bold text-white">{SYSTEM_LABELS[result.system]}</div>
+              <ul className="mt-3 space-y-1.5">
+                {result.reasons.map((r, i) => (
+                  <li key={i} className="text-xs text-gray-300 leading-relaxed">
+                    · {r}
+                  </li>
+                ))}
+              </ul>
             </div>
 
-            {result.warehouseCheck && (
-              <ZonePreview check={result.warehouseCheck} />
-            )}
-          </div>
+            <CheckTable checks={result.checks} title="법령 적합성 검토" />
+            <LawList laws={result.laws} />
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold text-gray-300">필요 밸브 · 부속</h3>
+              <div className="overflow-x-auto border border-gray-700 rounded-lg">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-800 text-gray-300">
+                    <tr>
+                      <th className="text-left px-3 py-2">부속</th>
+                      <th className="text-left px-3 py-2">규격</th>
+                      <th className="text-left px-3 py-2">내용</th>
+                      <th className="text-left px-3 py-2">근거</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {result.valves.map((v, i) => (
+                      <tr key={i} className="align-top hover:bg-gray-800/40">
+                        <td className="px-3 py-2 text-gray-200 whitespace-nowrap">
+                          {v.icon} {v.name}
+                        </td>
+                        <td className="px-3 py-2 text-gray-400 font-mono whitespace-nowrap">{v.size}</td>
+                        <td className="px-3 py-2 text-gray-400 leading-relaxed">{v.desc}</td>
+                        <td className="px-3 py-2 text-blue-300 font-mono text-[11px] whitespace-nowrap">{v.law}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         ) : (
-          <div className="flex items-center justify-center h-64 bg-gray-800 rounded-xl border border-gray-700 text-gray-500 text-sm">
-            설계 조건 입력 후 계산 버튼을 누르세요.
+          <div className="border border-dashed border-gray-700 rounded-lg p-8 text-center text-sm text-gray-500">
+            조건을 입력하고 「방식 판정」을 누르십시오.
           </div>
         )}
+
+        <details className="border border-gray-700 rounded-lg">
+          <summary className="px-3 py-2 text-xs font-semibold text-gray-300 cursor-pointer">
+            설치대상 확인 — {INSTALL_TARGETS_LAW}
+          </summary>
+          <div className="overflow-x-auto border-t border-gray-700">
+            <table className="w-full text-[11px]">
+              <tbody className="divide-y divide-gray-800">
+                {INSTALL_TARGETS.map(t => (
+                  <tr key={t.no} className="align-top">
+                    <td className="px-3 py-2 text-gray-500 font-mono whitespace-nowrap">{t.no}</td>
+                    <td className="px-3 py-2 text-gray-200">{t.target}</td>
+                    <td className="px-3 py-2 text-gray-400 leading-relaxed">{t.requirement}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
       </div>
     </div>
   );
 }
 
-// 실이 없을 때 totalArea로 가상 실 생성 (사전 추정용)
-function estimateRoomsFromArea(totalArea: number, usage: BuildingUsage): Room[] {
-  const riskMap: Record<string, RiskLevel> = {
-    warehouse_general: 'ordinary2',
-    warehouse_rack:    'extra',
-    warehouse_high:    'extra',
-    cold_storage:      'ordinary2',
-  };
-  const risk: RiskLevel = (riskMap[usage] as RiskLevel) ?? 'ordinary2';
-  return [{ id: 1, name: '창고 전체', w: Math.sqrt(totalArea), d: Math.sqrt(totalArea), risk }];
-}
-
-// 공통 폼 컴포넌트들
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <label className="block text-sm font-medium text-gray-300">{label}</label>
-      {hint && <p className="text-xs text-gray-500">{hint}</p>}
-      <div className="flex items-center gap-2 flex-wrap">{children}</div>
-    </div>
-  );
-}
-
-function Radio({
-  name, value, onChange, options,
+function Field({
+  label,
+  hint,
+  children,
 }: {
-  name: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <div className="flex flex-wrap gap-3">
-      {options.map(o => (
-        <label key={o.value} className="flex items-center gap-1.5 cursor-pointer">
-          <input
-            type="radio"
-            name={name}
-            value={o.value}
-            checked={value === o.value}
-            onChange={() => onChange(o.value)}
-            className="accent-blue-500"
-          />
-          <span className="text-sm text-gray-300">{o.label}</span>
-        </label>
-      ))}
-    </div>
-  );
-}
-
-function RadioRow({
-  name, value, checked, onChange, label, hint,
-}: {
-  name: string;
-  value: string;
-  checked: boolean;
-  onChange: () => void;
   label: string;
   hint?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <div>
+      <label className="label-base">{label}</label>
+      {children}
+      {hint && <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{hint}</p>}
+    </div>
+  );
+}
+
+function Check({
+  checked,
+  onChange,
+  label,
+  law,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  law: string;
+}) {
+  return (
+    <label className="flex items-start gap-2 cursor-pointer">
       <input
-        type="radio"
-        name={name}
-        value={value}
+        type="checkbox"
         checked={checked}
-        onChange={onChange}
-        className="accent-blue-500"
+        onChange={e => onChange(e.target.checked)}
+        className="mt-0.5 accent-blue-500"
       />
-      <span className="text-sm text-gray-300">{label}</span>
-      {hint && <span className="text-xs text-gray-500">({hint})</span>}
+      <span>
+        <span className="text-xs text-gray-200">{label}</span>
+        <span className="block text-[11px] text-gray-500 font-mono">{law}</span>
+      </span>
     </label>
   );
 }

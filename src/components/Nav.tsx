@@ -1,41 +1,54 @@
+const TABS = [
+  { label: '가이드', hint: '기준 요약' },
+  { label: '조건·방식', hint: '법정 강제 판단' },
+  { label: '수원·펌프', hint: '2.1 / 2.2' },
+  { label: '실·헤드', hint: '2.7.3 수평거리' },
+  { label: '배관', hint: '표 2.5.3.3' },
+  { label: '개방형 구역', hint: '2.1.1.2 · 30개' },
+  { label: '건식 내용적', hint: '2,840 L' },
+  { label: '수리계산', hint: 'Hazen-Williams' },
+  { label: '계산서', hint: '출력' },
+];
+
 interface NavProps {
   activeTab: number;
   onTabChange: (i: number) => void;
 }
 
-const TABS = [
-  { label: '① 가이드',     sub: '시스템 안내' },
-  { label: '② 시스템 선정', sub: '설계조건 입력' },
-  { label: '③ 헤드 배치',  sub: '실별 배치 계산' },
-  { label: '④ 배관 계산',  sub: '구경 산정' },
-  { label: '⑤ 수리계산',   sub: 'H-W 압력손실' },
-  { label: '⑥ 계산서 출력', sub: '인쇄 / PDF' },
-];
-
 export default function Nav({ activeTab, onTabChange }: NavProps) {
   return (
-    <nav className="bg-gray-900 border-b border-gray-700">
+    <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur sticky top-0 z-20">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex items-center gap-1 overflow-x-auto">
-          <div className="flex-shrink-0 mr-4 py-3">
-            <span className="text-blue-400 font-bold text-sm">🔥 SP 설계도구</span>
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <h1 className="text-base font-bold text-white">스프링클러 설계 검토</h1>
+            <p className="text-[11px] text-gray-500">
+              NFTC 103 (2024.1.1 시행) · NFPC 609 · 시행령 별표 4 원문 기준
+            </p>
           </div>
-          {TABS.map((tab, i) => (
+          <span className="hidden sm:inline text-[11px] text-gray-500 border border-gray-700 rounded px-2 py-1">
+            인허가 도서 반영 전 원문 대조 필수
+          </span>
+        </div>
+
+        <nav className="flex gap-1 overflow-x-auto pb-2">
+          {TABS.map((t, i) => (
             <button
-              key={i}
+              key={t.label}
               onClick={() => onTabChange(i)}
-              className={`flex-shrink-0 px-4 py-3 text-sm border-b-2 transition-colors ${
-                activeTab === i
-                  ? 'border-blue-500 text-blue-400 font-semibold'
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-              }`}
+              className={
+                'shrink-0 px-3 py-1.5 rounded-t-md text-xs font-medium transition-colors border-b-2 ' +
+                (activeTab === i
+                  ? 'border-blue-500 text-white bg-gray-800'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:bg-gray-800/50')
+              }
             >
-              <div>{tab.label}</div>
-              <div className="text-xs text-gray-500">{tab.sub}</div>
+              <span>{t.label}</span>
+              <span className="ml-1.5 text-[10px] text-gray-500">{t.hint}</span>
             </button>
           ))}
-        </div>
+        </nav>
       </div>
-    </nav>
+    </header>
   );
 }

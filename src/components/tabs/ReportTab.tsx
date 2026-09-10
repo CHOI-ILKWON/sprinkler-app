@@ -1,313 +1,230 @@
 import { useState } from 'react';
-import type { SystemResult, Room, PipeCalcResult, HydraulicResult, WarehouseCheck } from '../../types';
-import { buildCheckItems, buildMaterialList, USAGE_LABEL, SYSTEM_LABEL } from '../../lib/reportGenerator';
-import { RISK_TABLE, SIMULTANEOUS_HEADS, SIMULTANEOUS_HEADS_LAW, MAX_HEADS_PER_BRANCH } from '../../constants/nfpc';
+import type {
+  DesignCondition,
+  SystemResult,
+  WaterSupplyResult,
+  Room,
+  PipeCalcResult,
+  HydraulicResult,
+  DryVolumeResult,
+  ZoneCheck,
+  LawCheck,
+} from '../../types';
+import { SYSTEM_LABELS } from '../../types';
+import { STANDARD_LABEL, RELATED_STANDARDS } from '../../constants/nfpc';
 
-interface ReportTabProps {
+interface Props {
+  condition: DesignCondition;
   systemResult: SystemResult | null;
+  waterSupply: WaterSupplyResult | null;
   rooms: Room[];
   pipeResult: PipeCalcResult | null;
   hydraulicResult: HydraulicResult | null;
-  warehouseCheck: WarehouseCheck | null;
+  dryVolume: DryVolumeResult | null;
+  zoneCheck: ZoneCheck | null;
 }
 
-export default function ReportTab({ systemResult, rooms, pipeResult, hydraulicResult, warehouseCheck }: ReportTabProps) {
-  const [projectName, setProjectName] = useState('');
-  const [designerName, setDesignerName] = useState('');
-  const [generated, setGenerated] = useState(false);
+export default function ReportTab(p: Props) {
+  const [project, setProject] = useState('');
+  const [designer, setDesigner] = useState('');
+  const date = new Date().toISOString().slice(0, 10);
 
-  const canGenerate = rooms.length > 0 && pipeResult !== null;
-
-  const handleGenerate = () => {
-    if (!canGenerate) return;
-    setGenerated(true);
-  };
-
-  const dominantRisk = (['extra', 'ordinary2', 'ordinary1', 'light'] as const)
-    .find(r => rooms.some(rm => rm.risk === r)) ?? 'ordinary1';
-  const risk = RISK_TABLE[dominantRisk];
-  const simHeads = SIMULTANEOUS_HEADS[dominantRisk] ?? 20;
-  const flowPerHead = risk.flow;
-  const designFlow = simHeads * flowPerHead;
-  const totalArea = rooms.reduce((s, r) => s + r.w * r.d, 0);
-
-  const checkItems = generated && pipeResult
-    ? buildCheckItems({ projectName, designerName, date: '', systemResult, rooms, pipeResult, hydraulicResult, warehouseCheck })
-    : [];
-
-  const materialList = generated && pipeResult
-    ? buildMaterialList({ projectName, designerName, date: '', systemResult, rooms, pipeResult, hydraulicResult, warehouseCheck })
-    : null;
+  const allChecks: LawCheck[] = [
+    ...(p.systemResult?.checks ?? []),
+    ...(p.waterSupply?.checks ?? []),
+    ...(p.pipeResult?.checks ?? []),
+    ...(p.hydraulicResult?.checks ?? []),
+  ];
+  const failed = allChecks.filter(c => !c.isPassing && !c.isWarning);
+  const warnings = allChecks.filter(c => c.isWarning);
 
   return (
-    <div>
-      {/* 컨트롤 바 (인쇄 시 숨김) */}
-      <div className="no-print flex flex-wrap gap-3 mb-6 items-center">
-        <input
-          className="input-base flex-1 min-w-[200px]"
-          placeholder="프로젝트명"
-          value={projectName}
-          onChange={e => setProjectName(e.target.value)}
-        />
-        <input
-          className="input-base w-40"
-          placeholder="설계자명"
-          value={designerName}
-          onChange={e => setDesignerName(e.target.value)}
-        />
-        <button
-          onClick={handleGenerate}
-          disabled={!canGenerate}
-          className="bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors whitespace-nowrap"
-        >
-          📋 계산서 생성
-        </button>
-        <button
-          onClick={() => window.print()}
-          disabled={!generated}
-          className="bg-gray-600 hover:bg-gray-500 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors whitespace-nowrap"
-        >
-          🖨️ 인쇄 / PDF
-        </button>
-        {!canGenerate && (
-          <span className="text-yellow-400 text-sm">탭③ 실 입력 → 탭④ 배관 계산 후 생성 가능</span>
-        )}
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 print:hidden">
+        <div>
+          <label className="label-base">공사명</label>
+          <input className="input-base" value={project} onChange={e => setProject(e.target.value)} />
+        </div>
+        <div>
+          <label className="label-base">작성자</label>
+          <input className="input-base" value={designer} onChange={e => setDesigner(e.target.value)} />
+        </div>
+        <div className="flex items-end">
+          <button onClick={() => window.print()} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2.5 rounded-lg">
+            인쇄 / PDF 저장
+          </button>
+        </div>
       </div>
 
-      {!generated ? (
-        <div className="flex items-center justify-center h-64 bg-gray-800 rounded-xl border border-gray-700 text-gray-500 text-sm">
-          프로젝트명, 설계자명 입력 후 계산서 생성 버튼을 누르세요.
-        </div>
-      ) : (
-        <div id="report-body" className="bg-white text-gray-900 rounded-xl p-8 space-y-8 text-sm">
-
-          {/* 섹션1: 표지 */}
-          <div className="report-section text-center border-b-2 border-gray-800 pb-8">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">스프링클러설비 설계 계산서</h1>
-            <div className="space-y-2 text-gray-700">
-              <p className="text-lg">{projectName || '(프로젝트명 미입력)'}</p>
-              <p>설계자: {designerName || '(설계자명 미입력)'}</p>
-              <p>작성일: {new Date().toLocaleDateString('ko-KR')}</p>
-              <p className="text-xs text-gray-500 mt-4">적용 법규: NFPC 103 (국가화재안전기준, 소방청 고시)</p>
-            </div>
+      <div className="bg-white text-gray-900 rounded-lg p-6 space-y-5 print:p-0">
+        <header className="border-b-2 border-gray-900 pb-3">
+          <h1 className="text-xl font-bold">스프링클러설비 설계 검토서</h1>
+          <div className="text-xs text-gray-600 mt-1 flex gap-4 flex-wrap">
+            <span>공사명: {project || '—'}</span>
+            <span>작성자: {designer || '—'}</span>
+            <span>작성일: {date}</span>
           </div>
+          <p className="text-[11px] text-gray-600 mt-2 leading-relaxed">
+            근거: 스프링클러설비의 화재안전기술기준(NFTC 103, 2024.1.1 시행) · 창고시설의 화재안전성능기준(NFPC 609,
+            2024.1.1 시행) · 소방시설 설치 및 관리에 관한 법률 시행령 별표 4. 본 검토서는 설계 보조자료이며 법적
+            효력이 없습니다. 인허가 도서 반영 전 원문 대조와 관할 소방서 협의가 필요합니다.
+          </p>
+        </header>
 
-          {/* 섹션2: 설계 개요 */}
-          <ReportSection title="1. 설계 개요">
-            <table className="report-table">
-              <thead><tr><ReportTh>항목</ReportTh><ReportTh>내용</ReportTh><ReportTh>법규</ReportTh></tr></thead>
-              <tbody>
-                <ReportRow cells={['건물 용도', USAGE_LABEL[systemResult?.system ?? ''] ?? (systemResult ? '기타' : '미선정'), 'NFPC 103 제4조']} />
-                <ReportRow cells={['스프링클러 종류', systemResult ? SYSTEM_LABEL[systemResult.system] : '미선정', 'NFPC 103 제4조']} />
-                <ReportRow cells={['위험등급', `${risk.label} (NFPC 103 제10조)`, 'NFPC 103 제10조']} />
-                <ReportRow cells={['총 방호면적', `${Math.round(totalArea).toLocaleString()} ㎡`, '-']} />
-                <ReportRow cells={['총 헤드 수', `${pipeResult?.totalHeads ?? 0} 개`, '-']} />
-              </tbody>
-            </table>
-          </ReportSection>
+        <Section title="1. 설계 조건">
+          <KV k="적용 기준" v={STANDARD_LABEL[p.condition.standard]} />
+          <KV k="구조" v={p.condition.fireproof ? '내화구조 (R = 2.3 m)' : '비내화구조 (R = 2.1 m)'} />
+          <KV k="천장(반자) 높이" v={`${p.condition.ceiling} m`} />
+          <KV k="동결 우려" v={{ normal: '없음', cold: '저온', freeze: '영하' }[p.condition.temp]} />
+          <KV k="격자형 배관방식" v={p.condition.gridPipe ? '적용 (방호구역 3,700 ㎡)' : '미적용'} />
+        </Section>
 
-          {/* 섹션3: 동시개방 기준개수 */}
-          <ReportSection title="2. 동시개방 기준개수 및 설계유량">
-            <table className="report-table">
-              <thead><tr><ReportTh>항목</ReportTh><ReportTh>수치</ReportTh><ReportTh>근거</ReportTh></tr></thead>
-              <tbody>
-                <ReportRow cells={['동시개방 기준개수', `${simHeads} 개`, SIMULTANEOUS_HEADS_LAW]} />
-                <ReportRow cells={['헤드 1개당 방수량', `${flowPerHead} LPM`, `NFPC 103 제10조 (${risk.label})`]} />
-                <ReportRow cells={['설계유량', `${designFlow} LPM`, `${simHeads}개 × ${flowPerHead} LPM`]} />
-                <ReportRow cells={['전체 헤드 합산유량', `${pipeResult?.totalFlow ?? 0} LPM`, '※ 배관경 산정 참고값 (설계유량과 상이)']} />
-              </tbody>
-            </table>
-          </ReportSection>
-
-          {/* 섹션4: 헤드 배치 */}
-          <ReportSection title="3. 헤드 선정 및 배치 §NFPC 103 제10조①">
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <ReportTh>실 명</ReportTh><ReportTh>크기 (m)</ReportTh>
-                  <ReportTh>등급</ReportTh><ReportTh>헤드수</ReportTh>
-                  <ReportTh>간격 X</ReportTh><ReportTh>간격 Y</ReportTh>
-                  <ReportTh>기준충족</ReportTh>
-                </tr>
-              </thead>
-              <tbody>
-                {pipeResult?.roomDetails.map((rd, i) => (
-                  <tr key={i}>
-                    <ReportTd>{rd.room.name}</ReportTd>
-                    <ReportTd>{rd.room.w}×{rd.room.d}</ReportTd>
-                    <ReportTd>{RISK_TABLE[rd.room.risk].label}</ReportTd>
-                    <ReportTd>{rd.heads}</ReportTd>
-                    <ReportTd>{rd.actualSpacingX.toFixed(2)}</ReportTd>
-                    <ReportTd>{rd.actualSpacingY.toFixed(2)}</ReportTd>
-                    <ReportTd>{rd.spacingOk ? <span className="check-ok">✅ 충족</span> : <span className="check-fail">❌ 초과</span>}</ReportTd>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ReportSection>
-
-          {/* 섹션5: 배관 계획 */}
-          <ReportSection title="4. 배관 계획 §NFPC 103 별표1, 제6조②">
-            <table className="report-table">
-              <thead>
-                <tr>
-                  <ReportTh>실 명</ReportTh><ReportTh>가지관</ReportTh>
-                  <ReportTh>교차관</ReportTh><ReportTh>주관(누적)</ReportTh>
-                  <ReportTh>유량(LPM)</ReportTh><ReportTh>가지관헤드</ReportTh>
-                </tr>
-              </thead>
-              <tbody>
-                {pipeResult?.roomDetails.map((rd, i) => (
-                  <tr key={i}>
-                    <ReportTd>{rd.room.name}</ReportTd>
-                    <ReportTd>{rd.branchPipe.size}</ReportTd>
-                    <ReportTd>{rd.crossPipe.size}</ReportTd>
-                    <ReportTd>{rd.cumulativePipe.size}</ReportTd>
-                    <ReportTd>{rd.roomFlow}</ReportTd>
-                    <ReportTd>
-                      {rd.hxCount > MAX_HEADS_PER_BRANCH
-                        ? <span className="check-fail">{rd.hxCount}개 (초과!)</span>
-                        : <span className="check-ok">{rd.hxCount}개</span>}
-                    </ReportTd>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="law-ref mt-1">입상관: {pipeResult?.riserPipe.size} — 누적 총 유량 {pipeResult?.totalFlow} LPM 기준</p>
-          </ReportSection>
-
-          {/* 섹션6: 수리계산 */}
-          <ReportSection title="5. 수리계산 결과 §NFPC 103 제10조④">
-            {hydraulicResult ? (
-              <>
-                <div className={`p-3 rounded mb-3 ${hydraulicResult.isOverPressure ? 'bg-yellow-50 border border-yellow-400' : 'bg-green-50 border border-green-400'}`}>
-                  <span className={hydraulicResult.isOverPressure ? 'check-warn' : 'check-ok'}>
-                    {hydraulicResult.isOverPressure ? '⚠ 과압 — 감압밸브 검토' : '✅ 기준 충족'}
-                  </span>
-                  <span className="ml-2">필요 공급압력: {hydraulicResult.requiredSupplyPressure.toFixed(3)} MPa</span>
-                </div>
-                <table className="report-table">
-                  <thead>
-                    <tr>
-                      <ReportTh>구간</ReportTh><ReportTh>관경</ReportTh><ReportTh>내경(mm)</ReportTh>
-                      <ReportTh>유량(LPM)</ReportTh><ReportTh>합계길이(m)</ReportTh><ReportTh>손실(MPa)</ReportTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {hydraulicResult.sections.map((s, i) => (
-                      <tr key={i}>
-                        <ReportTd>{s.name}</ReportTd>
-                        <ReportTd>{s.pipeSize}</ReportTd>
-                        <ReportTd>{s.innerDiameter}</ReportTd>
-                        <ReportTd>{s.flowLPM}</ReportTd>
-                        <ReportTd>{s.totalLength.toFixed(2)}</ReportTd>
-                        <ReportTd>{s.pressureLoss.toFixed(4)}</ReportTd>
-                      </tr>
-                    ))}
-                    <tr className="font-semibold bg-gray-100">
-                      <td colSpan={5} className="px-2 py-1 border border-gray-300">마찰손실 합계</td>
-                      <td className="px-2 py-1 border border-gray-300">{hydraulicResult.totalFrictionLoss.toFixed(4)}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan={5} className="px-2 py-1 border border-gray-300">실양정 손실</td>
-                      <td className="px-2 py-1 border border-gray-300">{hydraulicResult.elevationLoss.toFixed(4)}</td>
-                    </tr>
-                    <tr className="font-bold bg-blue-50">
-                      <td colSpan={5} className="px-2 py-1 border border-gray-300">필요 공급압력</td>
-                      <td className="px-2 py-1 border border-gray-300">{hydraulicResult.requiredSupplyPressure.toFixed(4)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
-            ) : (
-              <div className="bg-yellow-50 border border-yellow-300 rounded p-4 text-yellow-800 text-sm">
-                ⚠ 탭⑤ 수리계산을 먼저 실행한 후 계산서를 다시 생성하세요.
-              </div>
-            )}
-          </ReportSection>
-
-          {/* 섹션7: 적합성 검토 */}
-          <ReportSection title="6. 설계 적합성 검토">
-            <table className="report-table">
-              <thead>
-                <tr><ReportTh>항목</ReportTh><ReportTh>판정</ReportTh><ReportTh>실제값</ReportTh><ReportTh>기준값</ReportTh><ReportTh>법규</ReportTh></tr>
-              </thead>
-              <tbody>
-                {checkItems.map((item, i) => (
-                  <tr key={i}>
-                    <ReportTd>{item.label}</ReportTd>
-                    <ReportTd>
-                      {item.isWarning
-                        ? <span className="check-warn">⚠</span>
-                        : item.isPassing
-                          ? <span className="check-ok">✅</span>
-                          : <span className="check-fail">❌</span>}
-                    </ReportTd>
-                    <ReportTd>{item.actual}</ReportTd>
-                    <ReportTd>{item.standard}</ReportTd>
-                    <ReportTd><span className="law-ref">{item.law}</span></ReportTd>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ReportSection>
-
-          {/* 섹션8: 자재 수량 */}
-          {materialList && (
-            <ReportSection title="7. 자재 수량표 (설계 기준, 시공 시 실측 필요)">
-              {[
-                { title: '헤드류', items: materialList.heads },
-                { title: '밸브류', items: materialList.valves },
-                { title: '배관류', items: materialList.pipes },
-              ].map(g => (
-                <div key={g.title} className="mb-4">
-                  <h4 className="font-semibold text-gray-700 mb-1">{g.title}</h4>
-                  <table className="report-table">
-                    <thead><tr><ReportTh>품명</ReportTh><ReportTh>규격</ReportTh><ReportTh>수량</ReportTh><ReportTh>단위</ReportTh></tr></thead>
-                    <tbody>
-                      {g.items.map((item, i) => (
-                        <tr key={i}>
-                          <ReportTd>{item.name}</ReportTd>
-                          <ReportTd>{item.spec}</ReportTd>
-                          <ReportTd>{item.qty}</ReportTd>
-                          <ReportTd>{item.unit}</ReportTd>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        {p.systemResult && (
+          <Section title="2. 설비방식 선정">
+            <KV
+              k="선정 방식"
+              v={`${SYSTEM_LABELS[p.systemResult.system]} ${p.systemResult.isMandated ? '(법정 강제)' : p.systemResult.isManualOverride ? '(사용자 지정)' : '(설계 판단)'}`}
+            />
+            <ul className="text-xs mt-1 space-y-0.5">
+              {p.systemResult.reasons.map((r, i) => (
+                <li key={i}>· {r}</li>
               ))}
-              <p className="law-ref">※ 배관 수량은 평면 치수 기반 추정값. 시공 시 실측 및 Loss율 적용 필요.</p>
-            </ReportSection>
-          )}
+            </ul>
+          </Section>
+        )}
 
-        </div>
-      )}
+        {p.waterSupply && (
+          <Section title="3. 수원 및 가압송수장치">
+            <KV k="적용 기준개수 N" v={`${p.waterSupply.appliedHeadCount} 개${p.waterSupply.usedInstalledCount ? ' (실제 설치개수 적용)' : ''}`} />
+            <KV k="수원 (유효수량)" v={`${p.waterSupply.waterVolume.toFixed(1)} ㎥ = ${p.waterSupply.appliedHeadCount} × ${p.waterSupply.coefficient} ㎥`} />
+            <KV k="옥상수조" v={p.waterSupply.roofTankExempt ? '면제 (NFTC 103 2.1.2 단서)' : `${p.waterSupply.roofTankVolume.toFixed(1)} ㎥ (1/3 이상)`} />
+            <KV k="펌프 토출량" v={`${p.waterSupply.designFlowLPM.toLocaleString()} L/min = ${p.waterSupply.appliedHeadCount} × ${p.waterSupply.flowPerHead} L/min`} />
+            <KV k="전양정 H" v={`${p.waterSupply.totalHead.toFixed(1)} m (h₁ + h₂ + 10 m)`} />
+            <KV k="축동력 / 전동기" v={`${p.waterSupply.shaftPowerKW.toFixed(1)} kW → ${p.waterSupply.motorKW} kW`} />
+            <KV k="체절압력 상한 (140 %)" v={`${p.waterSupply.churnMaxHead.toFixed(1)} m 이하`} />
+            <KV k="150 % 유량 시 (65 %)" v={`${p.waterSupply.peakMinHead.toFixed(1)} m 이상 @ ${Math.round(p.waterSupply.peakFlowLPM).toLocaleString()} L/min`} />
+            <KV k="유량측정장치 (175 %)" v={`${Math.round(p.waterSupply.flowMeterMinLPM).toLocaleString()} L/min 이상`} />
+          </Section>
+        )}
+
+        {p.rooms.length > 0 && (
+          <Section title="4. 방호구역 및 헤드">
+            <KV k="총 방호면적" v={`${p.rooms.reduce((s, r) => s + r.w * r.d, 0).toFixed(0)} ㎡`} />
+            <KV k="유수검지장치 수" v={`${p.zoneCheck?.valveCount ?? 0} 개 (방호구역 ${p.zoneCheck?.maxAreaPerValve.toLocaleString()} ㎡ 이하)`} />
+            <KV k="총 헤드 수" v={`${p.pipeResult?.totalHeads ?? 0} 개`} />
+          </Section>
+        )}
+
+        {p.pipeResult && (
+          <Section title="5. 배관">
+            <KV k="설계유량" v={`${p.pipeResult.designFlow.toLocaleString()} L/min (기준개수 × 방수량)`} />
+            <KV k="주배관·입상관" v={p.pipeResult.mainPipe.size} />
+            <table className="w-full text-[11px] mt-2 border-t border-gray-300">
+              <thead>
+                <tr className="text-left">
+                  <th className="py-1">실</th>
+                  <th className="py-1">R</th>
+                  <th className="py-1">헤드</th>
+                  <th className="py-1">한쪽 가지</th>
+                  <th className="py-1">란</th>
+                  <th className="py-1">가지배관</th>
+                  <th className="py-1">교차배관</th>
+                </tr>
+              </thead>
+              <tbody>
+                {p.pipeResult.roomDetails.map(d => (
+                  <tr key={d.room.id} className="border-t border-gray-200">
+                    <td className="py-1">{d.room.name}</td>
+                    <td className="py-1">{d.horizontalDistance} m</td>
+                    <td className="py-1">{d.hxCount}×{d.hyCount}={d.heads}</td>
+                    <td className={'py-1 ' + (d.branchOk ? '' : 'text-red-600 font-bold')}>
+                      {d.headsPerBranchSide} / {d.branchLimit}
+                    </td>
+                    <td className="py-1">{d.pipeColumn}</td>
+                    <td className="py-1">{d.branchPipe.size}</td>
+                    <td className="py-1">{d.crossPipe.size} ×{d.crossMainCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Section>
+        )}
+
+        {p.dryVolume && (
+          <Section title="6. 건식 2차측 내용적">
+            <KV k="총 내용적" v={`${p.dryVolume.totalLiters.toFixed(0)} L / 기준 ${p.dryVolume.limitLiters.toLocaleString()} L`} />
+            <KV k="판정" v={p.dryVolume.exceeds ? '초과 — 시험장치 개폐밸브 완전 개방 후 1분 이내 방수 입증 필요' : '이내 — 별도 입증 불요'} />
+            <p className="text-[11px] text-gray-600 mt-1">근거: {p.dryVolume.law}</p>
+          </Section>
+        )}
+
+        {p.hydraulicResult && (
+          <Section title="7. 수리계산">
+            <KV k="배관 마찰손실" v={`${p.hydraulicResult.totalFrictionLoss.toFixed(3)} MPa`} />
+            <KV k="낙차손실" v={`${p.hydraulicResult.elevationLoss.toFixed(3)} MPa`} />
+            <KV k="필요 송수압력" v={`${p.hydraulicResult.requiredSupplyPressure.toFixed(3)} MPa`} />
+          </Section>
+        )}
+
+        <Section title="8. 법령 적합성 종합">
+          <div className="text-xs space-y-1">
+            <p>
+              검토 항목 {allChecks.length}건 — 부적합 <b className={failed.length ? 'text-red-600' : ''}>{failed.length}</b>건,
+              확인 필요 <b className="text-yellow-700">{warnings.length}</b>건
+            </p>
+            {failed.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {failed.map((c, i) => (
+                  <li key={i} className="text-red-700">
+                    ✗ {c.label}: {c.actual} (기준: {c.standard}) — {c.law}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {warnings.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {warnings.map((c, i) => (
+                  <li key={i} className="text-yellow-700">
+                    △ {c.label}: {c.standard} — {c.law}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Section>
+
+        <Section title="9. 함께 확인해야 하는 기준">
+          <table className="w-full text-[11px]">
+            <tbody>
+              {RELATED_STANDARDS.map(s => (
+                <tr key={s.code} className="border-t border-gray-200 align-top">
+                  <td className="py-1 pr-2 font-semibold whitespace-nowrap">{s.code}</td>
+                  <td className="py-1 pr-2">{s.title}</td>
+                  <td className="py-1 text-gray-600">{s.why}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      </div>
     </div>
   );
 }
 
-function ReportSection({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="report-section">
-      <h2 className="text-base font-bold text-gray-800 border-b border-gray-400 pb-1 mb-3">{title}</h2>
+    <section className="border-t border-gray-300 pt-3">
+      <h2 className="text-sm font-bold mb-1.5">{title}</h2>
       {children}
-    </div>
+    </section>
   );
 }
 
-function ReportTh({ children }: { children: React.ReactNode }) {
-  return <th className="px-2 py-1.5 text-left bg-gray-100 border border-gray-300 text-gray-700 font-semibold text-xs whitespace-nowrap">{children}</th>;
-}
-
-function ReportTd({ children }: { children: React.ReactNode }) {
-  return <td className="px-2 py-1 border border-gray-200 text-gray-700 text-xs">{children}</td>;
-}
-
-function ReportRow({ cells }: { cells: string[] }) {
+function KV({ k, v }: { k: string; v: string }) {
   return (
-    <tr>
-      {cells.map((c, i) => <ReportTd key={i}>{c}</ReportTd>)}
-    </tr>
+    <div className="flex text-xs py-0.5">
+      <span className="w-48 shrink-0 text-gray-600">{k}</span>
+      <span className="font-medium">{v}</span>
+    </div>
   );
 }
