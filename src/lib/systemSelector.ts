@@ -30,6 +30,10 @@ import {
   TAMPER_SWITCH_LAW,
   PUMP_ACCESSORY,
   WAREHOUSE_EMERGENCY_POWER,
+  START_DEVICE,
+  JOCKEY_SIZING,
+  HEAD_PRESSURE,
+  PRV_NAMING_WARNING,
 } from '../constants/nfpc';
 
 interface Mandate {
@@ -313,10 +317,25 @@ export function getValveList(system: SystemType, size = '100A'): ValveItem[] {
     },
     {
       icon: '🫧',
-      name: '기동용수압개폐장치 (압력챔버)',
-      size: `${PUMP_ACCESSORY.pressureChamberLiters} L 이상`,
-      desc: '배관 압력변동을 검지하여 펌프 자동 기동',
-      law: PUMP_ACCESSORY.pressureChamberLaw,
+      name: '기동용수압개폐장치 〈센서〉',
+      size: `압력챔버 사용 시 ${START_DEVICE.chamberLiters} L 이상 / 기동용압력스위치 방식은 용적 규정 없음`,
+      desc:
+        `${START_DEVICE.role}. ${START_DEVICE.capacityNote} ` +
+        `인출점 — ${START_DEVICE.tapPoint}. ⚠ ${START_DEVICE.tapWarning}. ` +
+        `압력챔버 방식은 상부 공기가 물로 차면 완충을 잃어 헌팅하므로 주기적으로 배수·공기충전이 필요하고, ` +
+        `기동용압력스위치 방식은 스위치의 불감대(기동압-정지압 간격)와 시간지연으로 이를 대신한다.`,
+      law: `${START_DEVICE.definitionLaw} / ${START_DEVICE.chamberLaw} / ${START_DEVICE.testLaw}`,
+    },
+    {
+      icon: '🔁',
+      name: '충압펌프 〈액추에이터〉',
+      size: '소용량',
+      desc:
+        `기동용수압개폐장치가 「읽는 눈」이라면 충압펌프는 「보충하는 손」 — 중복이 아니라 센서와 액추에이터 관계다. ` +
+        `토출압력은 최고위 살수장치의 자연압보다 적어도 ${PUMP_ACCESSORY.jockeyExtraMPa} MPa 크게 하거나 가압송수장치의 정격토출압력과 같게. ` +
+        `용량은 「${JOCKEY_SIZING.rule}」 — 너무 작으면 ${JOCKEY_SIZING.tooSmall}, 너무 크면 ${JOCKEY_SIZING.tooLarge}. ` +
+        `면제: ${JOCKEY_SIZING.exemptions.join(' / ')}`,
+      law: JOCKEY_SIZING.law,
     },
     {
       icon: '💧',
@@ -356,6 +375,28 @@ export function getValveList(system: SystemType, size = '100A'): ValveItem[] {
       size: `${MIN_PIPE_SIZE.drainRiser.mm} ㎜ 이상`,
       desc: '수직배관 구경이 50 ㎜ 미만이면 수직배관과 동일 구경 가능',
       law: MIN_PIPE_SIZE.drainRiser.law,
+    },
+    {
+      icon: '💥',
+      name: '수격방지기 (법정 아님)',
+      size: '계통별 산정',
+      desc:
+        '밸브 급폐쇄·펌프 급정지 시 ΔP = ρ·a·Δv 만큼 압력파가 발생한다. 유속 3 ㎧가 순간 정지하면 약 3.6 MPa로, ' +
+        '설계압 1.2 MPa 계통의 3배에 달한다. 일제개방밸브 급개방(빈 배관에 물이 쏟아짐)에서 특히 심하다. ' +
+        '⚠ NFTC 103에 수격방지기 조항은 없으며 설계자 시방 사항이다. 저슬램 체크밸브·밸브 조작시간 연장으로도 대응한다.',
+      law: '국내 화재안전기준에 규정 없음 (설계 시방)',
+    },
+    {
+      icon: '🔻',
+      name: '감압장치',
+      size: '계통별',
+      desc:
+        `헤드 선단 ${HEAD_PRESSURE.max} MPa 초과 시 필요. 압력은 아래로 갈수록 높아지므로 저층부가 대상이다. ` +
+        `방법은 ① 계통 분리(중간층 기계실에서 존 분할) ② 감압밸브(입상관 존 분기부·유수검지장치 1차측) ` +
+        `③ 감압 오리피스·감압형 앵글밸브(방수구 인입 측). ` +
+        `⚠ NFTC 103은 방수압 상한만 정하고 감압장치의 방법·위치를 규정하지 않는다 — 설계자 판단. ` +
+        PRV_NAMING_WARNING,
+      law: `${HEAD_PRESSURE.law} (상한만 규정)`,
     },
   ];
 

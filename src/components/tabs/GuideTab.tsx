@@ -19,6 +19,12 @@ import {
   RELATED_STANDARDS,
   KFS_1013_NOTE,
   ESFR,
+  START_DEVICE,
+  JOCKEY_SIZING,
+  PRESSURE_ZONE,
+  PRESSURE_REDUCING_METHODS,
+  PRV_NAMING_WARNING,
+  maxZoneHeight,
 } from '../../constants/nfpc';
 
 const SYSTEMS = [
@@ -267,6 +273,60 @@ export default function GuideTab() {
           <p className="text-gray-500">
             면적(㎡)이 아니라 내용적(L)입니다. 배관 체적밀도는 구경 구성에 따라 크게 달라지므로 면적으로 고정하면
             양방향으로 틀립니다. 「건식 내용적」 탭에서 구경별 연장으로 집계하십시오.
+          </p>
+        </InfoBox>
+
+        <InfoBox title="기동용수압개폐장치 vs 충압펌프 — 중복이 아닙니다">
+          <p className="text-gray-300">· 기동용수압개폐장치 = <b>센서</b> — {START_DEVICE.role}</p>
+          <p className="text-gray-300">· 충압펌프 = <b>액추에이터</b> — 실제로 물을 밀어 압력을 회복</p>
+          <p className="text-gray-500">{START_DEVICE.capacityNote}</p>
+          <p className="pt-1 text-gray-300">인출점 — {START_DEVICE.tapPoint}</p>
+          <p className="text-yellow-300">⚠ {START_DEVICE.tapWarning}</p>
+          <p className="text-gray-500 pt-1">
+            압력챔버 100 L는 <b>{START_DEVICE.chamberLaw}</b> — 「중 압력챔버를 사용할 경우」이므로
+            기동용압력스위치 방식이면 적용되지 않습니다.
+          </p>
+          <p className="text-gray-500">충압펌프 용량 — {JOCKEY_SIZING.rule}</p>
+        </InfoBox>
+
+        <InfoBox title="감압 — 하나의 존이 커버할 수 있는 높이">
+          <table className="w-full">
+            <thead className="text-gray-300">
+              <tr>
+                <th className="text-left py-1">설비</th>
+                <th className="text-left py-1">방수압 범위</th>
+                <th className="text-left py-1">이론 최대 존 높이</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800">
+              {PRESSURE_ZONE.map(z => (
+                <tr key={z.system}>
+                  <td className="py-1 text-gray-300">{z.system}</td>
+                  <td className="py-1 font-mono">{z.min} ~ {z.max} MPa</td>
+                  <td className="py-1 font-mono text-gray-100">{maxZoneHeight(z.min, z.max).toFixed(0)} m</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="text-gray-500 pt-1">
+            하나의 존은 <b>최상단이 최소압을, 최하단이 최대압을</b> 동시에 만족해야 합니다. 마찰손실·안전여유를 빼면
+            실무 존 높이는 위 값의 60~70 % 수준입니다 ⚠. 옥내소화전이 스프링클러보다 스팬이 절반이라 존이 더 자주
+            나뉩니다.
+          </p>
+          <p className="text-yellow-300 pt-1">⚠ {PRV_NAMING_WARNING}</p>
+        </InfoBox>
+
+        <InfoBox title="감압장치 — 어디에 다는가">
+          {PRESSURE_REDUCING_METHODS.map(m => (
+            <div key={m.method} className="pb-1">
+              <p className="text-gray-200 font-semibold">{m.method}</p>
+              <p className="text-gray-400">위치 — {m.where}</p>
+              <p className="text-green-400">+ {m.pros}</p>
+              <p className="text-red-400">− {m.cons}</p>
+            </div>
+          ))}
+          <p className="text-gray-500">
+            ⚠ NFTC 103은 방수압 상한(2.2.1.10)만 정하고 감압장치의 방법·위치를 규정하지 않습니다 — 설계자 판단입니다.
           </p>
         </InfoBox>
 
